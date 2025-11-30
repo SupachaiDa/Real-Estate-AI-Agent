@@ -57,10 +57,10 @@ async function generateEmbeddings() {
       const { error: updateError } = await supabase
         .from('Properties')
         .update({ embedding })
-        .eq('Id', prop.Id);
+        .eq('Id', prop.id);
 
-      if (updateError) console.error(`❌ Failed to update Id ${prop.Id}:`, updateError);
-      else console.log(`✅ Updated embedding for Id ${prop.Id}`);
+      if (updateError) console.error(`❌ Failed to update Id ${prop.id}:`, updateError);
+      else console.log(`✅ Updated embedding for Id ${prop.id}`);
     }
 
     console.log('✅ All embeddings generated!');

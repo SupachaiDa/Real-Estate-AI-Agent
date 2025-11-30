@@ -10,7 +10,7 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
-export async function createChatEntry( userId, userQuery, reply ) {
+export async function createChatEntry( userId, userQuery, reply, intent, property_id ) {
 	
 	console.log(userId, userQuery, reply)
 	
@@ -22,6 +22,8 @@ const { data } = await supabase
         Role: "user",  
 		TimeStemp: new Date(),     
         Message: userQuery,
+        intent:intent,
+        Property_Id:property_id
       },   
     ])
     .select();
@@ -34,6 +36,8 @@ const { data } = await supabase
         Role: "ai",  
 		TimeStemp: new Date(),     
         Message: reply,
+        intent:intent,
+        Property_Id:property_id
       },   
     ])
     .select();

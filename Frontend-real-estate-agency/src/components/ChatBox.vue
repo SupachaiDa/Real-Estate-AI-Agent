@@ -73,7 +73,7 @@ import { ref, nextTick, defineModel } from "vue";
 import axios from "axios";
 import { useChatStore } from "../stores/chatStore";
 
-const selectedIntent = ref("main"); 
+const selectedModel = ref("main"); 
 const selectedLanguage = ref("thai"); 
 
 interface ChatItem {
@@ -119,7 +119,6 @@ async function sendMessage() {
       userId: chat.uid, 
       userQuery: msgToSend,
       language: selectedLanguage.value,
-      intention: selectedIntent.value
     });
 
     // AI text reply
@@ -130,7 +129,7 @@ async function sendMessage() {
 
     // AI property grid
     let properties = ''
-    if(selectedIntent.value === 'buy') {
+    if(res.data.intent === 'buy') {
       properties = res.data.properties || res.data.replyimg
     }else {
       properties = res.data.properties

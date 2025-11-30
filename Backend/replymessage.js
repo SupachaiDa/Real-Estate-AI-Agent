@@ -7,36 +7,89 @@ dotenv.config();
 
 // Initialize Supabase client
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
 const { data: chatHistory, error } = await supabase
   .from("ChatHistories")
-  .select("Role, Message")
-  //.order("TimeStemp", { ascending: true });
+  .select("Role, Message, intent, id, Property_Id")
+  .order("id", { ascending: false })
+  .limit(10)
 
 if (error) {
   console.error("Supabase error:", error);
 }
 
-const safeHistory = Array.isArray(chatHistory) ? chatHistory : [];
+const safeHistory = chatHistory ?? [];
 
 const historyText_global = safeHistory
-  .map(h => `${h.Role}: ${h.Message}`)
+  .map(h => `${h.id} : ${h.Role} : ${h.intent} : ${h.Property_Id} : ${h.Message}`)
   .join("\n");
- 
+  
+  const historyPropertyId_global = safeHistory.map(
+	h => Number(h.Property_Id ?? 0)
+  );
+  
+  const intentHistory_global = safeHistory.map(h =>
+	String(h.intent ?? "")
+  );
+  
+  console.log(historyPropertyId_global, intentHistory_global)
+  
+  let insertedProperty = null; 
 
-//console.log("CHAT HISTORYYY :\n" + historyText);
+  if(intentHistory_global[0] === 'sell' || intentHistory_global[0] === 'sellInprogress') {
+	
+	const { data:dataInsertedProperty, error:errorInsertedProperty } = await supabase
+	  .from("Properties_temp")
+	  .select(`
+	  	Id,
+		Title,
+		Type,
+		New,
+		Description,
+		Floor,
+		Bed_room,
+		Bath_room,
+		Price,
+		Size,
+		Location
+	  `)
+	  .eq("Id", historyPropertyId_global[0]);
+
+	  insertedProperty = dataInsertedProperty; 	  
+
+  if (errorInsertedProperty) {
+	console.error("Supabase errorInsertedProperty:", errorInsertedProperty);
+  }
+  }
+  
+//console.log("CHAT HISTORY:\n" + historyText_global);
 
 // Analyze user's intent ("Consult", "Buy", "Appointment", "Sell", )
-async function userIntent(userQuery, historyText_global) {
+async function userIntent(userQuery, historyText_global, insertedProperty) {
+	
+	console.log("DATA:", insertedProperty);
+
+	let nullColumns = null
+	const row = insertedProperty?.[0];
+  
+	if (row) {
+	  nullColumns = Object.keys(row).filter(key => row[key] === null || row[key] === '' || row[key] === 0);
+	  console.log("NULL columns:", nullColumns);
+	}
+	
 	const prompt = `
 Analyze the user's message and determine their intent as follows:
 1) If the message is a trivia question not related to properties → "consult"
 2) If the user is looking for a property to buy → "buy"
 3) If the user wants an appointment to see properties → "appointment"
 4) If the user wants to sell a property → "sell"
-5) If unclear → "hesitate"
+5) If the user wants to sell a property from the previous chat and did not fill in all of the required information → "sellInprogress"
+6) If unclear → "hesitate"
 
 Conversation history:
 ${JSON.stringify(historyText_global)}
+The Conversation history guideline:
+id -> you can check the sequence of the message from here : Role -> you can check whether the message has been sent from user or ai : intent -> the intent of the message : Message
 
 Current user message:
 "${userQuery}"
@@ -61,7 +114,7 @@ Your tasks:
 3) If user_intent is NOT "appointment":
      Always return "date_time": ""
 	 
-4) If user_intent = "sell":
+4) If user_intent = "sell" or "sellInprogress":
 - Name of the property -> "title"
 - Type of the property -> "type"
 - Condition of the property -> "If it is the new one set condition:"Y" and condition:"N" for the used one"
@@ -73,13 +126,14 @@ Your tasks:
 - The location of the building -> "location"
 - The expected price of the seller -> "price"
 If the user did NOT provide enough inforamation, I (the system) will ask the user for more details
+Check the missing information from ${nullColumns}
 
 STRICT RESPONSE RULES:
 - Respond ONLY with valid JSON
 - NO backticks, NO markdown, NO explanations
 - Fields:
 {
-  "user_intent": "consult" | "buy" | "appointment" | "sell" | "hesitate",
+  "user_intent": "consult" | "buy" | "appointment" | "sell" | "sellInprogress" | "hesitate",
   "summarize_chat": "text",
   "date_time": "DD/MM/YYYYTHH:MM" or "",
   "title": text,
@@ -181,7 +235,7 @@ STRICT RESPONSE RULES:
 
 async function replyToClient(userQuery, language, userId) {
 	// User's intent
-	const result = await (await userIntent(userQuery, historyText_global))
+	const result = await (await userIntent(userQuery, historyText_global,insertedProperty))
 	const intent = result.user_intent
 	const summarize = result.summarize_chat
 	const title = result.title
@@ -200,13 +254,14 @@ async function replyToClient(userQuery, language, userId) {
 	
 	let matches = []; 
 	let prompt = ''
+	let property_id = 0
 	
 	switch(intent) {
 		case "consult":  
 		
 		prompt = `
 		You are a friendly and knowledgeable real estate assistant.
-		Search for knowledge from the internet.
+		Search for knowledge from the internet.dzfs
 		
 		The previous conversation ${summarize}
 		The latest User query: "${userQuery}"
@@ -264,31 +319,34 @@ async function replyToClient(userQuery, language, userId) {
 		case "sell":
 		
 		const { data, error } = await supabase
-			.from("Properties")
-			.insert([
-			  {
-				Poster: userId,
-				Title: title,
-				Type: type,
-				New: condition,
-				Description: description,
-				Floor: floor,
-				Bed_room: bedroom,
-				Bath_room: bathroom,
-				Size: size,
-				Location: location,
-				Price: price
-			  },   
-			])
-			.select();
-			
-		
-		  if (error) {
-			console.error("❌ Insert Property failed:", error);
-			return null;
-		  }
-		  console.log("✅ Inserted Property:", data);
-	
+  .from("Properties_temp")
+  .insert([
+    {
+      Poster: userId,
+      Title: title,
+      Type: type,
+      New: condition,
+      Description: description,
+      Floor: floor,
+      Bed_room: bedroom,
+      Bath_room: bathroom,
+      Size: size,
+      Location: location,
+      Price: price
+    },
+  ])
+  .select();
+
+if (error) {
+  console.error("❌ Insert Property failed:", error);
+  return null;
+}
+
+const newId = data?.[0]?.Id;
+
+console.log("📌 New Property ID:", newId);
+
+property_id = newId
 		
 		
 		prompt = `
@@ -314,6 +372,63 @@ async function replyToClient(userQuery, language, userId) {
 		
 		`
 		break;
+		
+		case "sellInprogress":
+			
+			property_id = insertedProperty[0].Id
+			
+			const { data1, error1 } = await supabase
+			.from("Properties_temp")
+			.update([
+			  {
+				Poster: userId,
+				Title: title,
+				Type: type,
+				New: condition,
+				Description: description,
+				Floor: floor,
+				Bed_room: bedroom,
+				Bath_room: bathroom,
+				Size: size,
+				Location: location,
+				Price: price
+			  },   
+			])
+			.eq("Id", property_id);
+			
+		
+		  if (error1) {
+			console.error("❌ Updated Property failed:", error1);
+			return null;
+		  }
+		  console.log("✅ Updated Property:", data1);
+	
+		
+		
+		prompt = `
+		You are a friendly and knowledgeable real estate assistant.
+		   
+		
+		The previous conversation ${summarize}
+		The latest User query: "${userQuery}"
+		
+		To make sure the user provide all of this information
+		title: ${title}
+		type: ${type}
+		condition: ${condition}
+		description: ${description}
+		floor: ${floor}
+		bedroom: ${bedroom}
+		bathroom: ${bathroom}
+		size: ${size}
+		location: ${location}
+		price: ${price}
+		
+		Respond the query in ${language}. Keep your tone warm and helpful.
+		
+		`
+		
+		break;	
 	}
 	
 	 // Ask ChatGPT to summarize the best answer
@@ -330,31 +445,43 @@ async function replyToClient(userQuery, language, userId) {
 	  return {
 		message: response.data.choices[0].message.content,
    		img: matches,    
-    	intent
+    	intent,
+		property_id
 	  }
 }
 
 async function replyImage(userQuery) {
-	  // Step 1: Convert user query to embedding
-	  const embedResponse = await axios.post(
-		"https://api.openai.com/v1/embeddings",
-		{
-		  model: "text-embedding-3-small",
-		  input: userQuery,
-		},
-		{ headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
-	  );
-	
-	  const queryEmbedding = embedResponse.data.data[0].embedding;
-	
-	  // Step 2: Query Supabase RPC function for vector match
-	  const { data: matches, error } = await supabase.rpc("match_properties", {
-		query_embedding: queryEmbedding,
-		match_threshold: 0.7, // adjust as needed
-		match_count: 5, // top N results
-	  });
-		
-		return matches
-}
+	// Step 1: Convert user query to embedding
+	const embedResponse = await axios.post(
+	  "https://api.openai.com/v1/embeddings",
+	  {
+		model: "text-embedding-3-small",
+		input: userQuery,
+	  },
+	  { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
+	);
+  
+	const queryEmbedding = embedResponse.data.data[0].embedding;
+  
+	// Step 2: Query Supabase RPC function for vector match
+	const { data: matches, error } = await supabase.rpc("match_properties", {
+	  query_embedding: queryEmbedding,
+	  match_threshold: 0.7,
+	  match_count: 5,
+	});
+  
+	if (error) {
+	  console.error("❌ Supabase RPC ERROR:", error);
+	  return [];  // <-- ensure safe fallback
+	}
+  
+	if (!matches) {
+	  console.warn("⚠️ No matches returned (null). Returning empty array.");
+	  return [];
+	}
+  
+	return matches;
+  }
+  
 
 export { replyToClient };

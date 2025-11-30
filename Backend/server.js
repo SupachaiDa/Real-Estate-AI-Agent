@@ -29,12 +29,13 @@ const lineClient = new Client(lineConfig);
 app.post("/api/chat", async (req, res) => {
   try {
     const { userQuery, language, userId } = req.body;
-    const result = await replyToClient(userQuery, language);
+    const result = await replyToClient(userQuery, language, userId);
 
     const reply = result.message;
     const replyimg = result.img;
     const intent = result.intent;
-    const chatHistory = await createChatEntry(userId, userQuery, reply)
+    const property_id = result.property_id;
+    const chatHistory = await createChatEntry(userId, userQuery, reply, intent, property_id)
     
     //const replymessage = await replymessage(userQuery, language, chatHistory)
     res.json({ intent, reply, replyimg, chatHistory });
