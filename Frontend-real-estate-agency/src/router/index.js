@@ -5,6 +5,7 @@ import DataSet from '../components/DataSet.vue'
 import AboutUs from '../components/AboutUs.vue'
 
 import SignedUp from '../components/SignedUp.vue'
+import Profile from '../components/Profile.vue'
 import { auth } from "../firebase";
 
 const routes = [
@@ -28,6 +29,11 @@ const routes = [
 		path: '/signedup',
 		name: 'SignedUp',
 		component: SignedUp
+	},
+	{
+		path: '/profile',
+		name: 'Profile',
+		component: Profile
 	}
 ]
 

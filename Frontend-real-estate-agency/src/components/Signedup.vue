@@ -30,6 +30,13 @@
 
 <script setup>
 import { ref } from "vue";
+import axios from "axios";
+import { useRouter } from "vue-router";
+import { useUserStore } from "../stores/userStore";  // ⬅ Pinia store
+
+const router = useRouter();
+const userStore = useUserStore();
+
 import { auth } from "../firebase";
 import {
   signInWithEmailAndPassword,
@@ -40,6 +47,7 @@ const email = ref("");
 const password = ref("");
 const error = ref("");
 
+// =================== LOGIN ===================
 const login = async () => {
   try {
     const userCredential = await signInWithEmailAndPassword(
@@ -48,13 +56,19 @@ const login = async () => {
       password.value
     );
 
-    error.value = "";
-    alert("Logged in!");
+    const uid = userCredential.user.uid;
+    console.log("Logged-in UID:", uid);
+
+    // Save UID in Pinia
+    userStore.setUid(uid);
+
+    router.push("/profile");
   } catch (e) {
     error.value = e.message;
   }
 };
 
+// =================== REGISTER ===================
 const register = async () => {
   try {
     const userCredential = await createUserWithEmailAndPassword(
@@ -66,10 +80,15 @@ const register = async () => {
     const uid = userCredential.user.uid;
     console.log("New User UID:", uid);
 
-    // Save UID
-    localStorage.setItem("uid", uid);
+    // Save UID in Pinia
+    userStore.setUid(uid);
 
-    error.value = "";
+    // Send to backend
+    await axios.post("http://localhost:3000/api/signedup", {
+      id: uid,
+      name: "New User",
+    });
+
     alert("Account created!");
   } catch (e) {
     error.value = e.message;

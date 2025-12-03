@@ -2,7 +2,7 @@
   <div class="chat-container container">
      <!-- Content Config -->
     <div class="content-config">
-      <select v-model="selectedIntent">
+      <select v-model="selectedModel">
         <option value="main">MAIN</option>
         <option value="n8n">n8n</option>
       </select>
@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, defineModel } from "vue";
+import { ref, nextTick, defineModel, useId } from "vue";
 import axios from "axios";
 import { useChatStore } from "../stores/chatStore";
 
@@ -148,17 +148,85 @@ async function sendMessage() {
 /*************************************************
  * USER SELECTS AN IMAGE → PREVIEW IN CHAT
  *************************************************/
-function onImageSelected(event: Event) {
-  const target = event.target as HTMLInputElement;
+
+async function onImageSelected(event: Event) {
+  let intentHistory = null
+  try {
+    const res = await axios.post("http://localhost:3000/api/insertimg", {
+      userId: chat.uid
+    });
+    intentHistory = res.data.intentHistory[0]
+    
+    // AI text reply
+  } catch (err) {
+    messages.push({ sender: "AI", type: "text", content: "Error connecting to backend." });
+    scrollToBottom();
+  }
+  
+    console.log(intentHistory)
+  
+  if (intentHistory === "sell" || intentHistory === "sellInprogress") {
+     const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (!file) return;
 
+  const CLOUD_NAME = "dt9lsfnnk";
+  const PRESET = "properties"; // your unsigned preset
+
+  // Show a temporary preview first
   const previewUrl = URL.createObjectURL(file);
-  messages.push({ sender: "You", type: "image", content: previewUrl });
+ const tempMessage: ChatItem = {
+  sender: "You",
+  type: "image",
+  content: previewUrl,
+};
+  messages.push(tempMessage);
   scrollToBottom();
 
-  // TODO: Upload the image to backend if needed
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", PRESET);
+  let imageUrl = ""
+  try {
+    const res = await axios.post(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    const cloudUrl = res.data.secure_url;
+ 
+    imageUrl = cloudUrl
+    // Replace preview with the uploaded URL
+    tempMessage.content = cloudUrl;
+
+    scrollToBottom();
+    
+  } catch (err: any) {
+    console.error("Cloudinary Upload Error:", err.response?.data || err);
+    messages.push({
+      sender: "AI",
+      type: "text",
+      content: "❌ Failed to upload image.",
+    });
+  }
+   try {
+    const res = await axios.post("http://localhost:3000/api/insertedimg", {
+      userId: chat.uid,
+      imgUrl: imageUrl
+    });
+    intentHistory = res.data.intentHistory[0]
+    
+    // AI text reply
+  } catch (err) {
+    console.log("The error from uploaded imgae:", err)
+  }
+  
+  }else {
+    alert("Please chat with us more!")
+  }
 }
+
 </script>
 
 <style scoped>

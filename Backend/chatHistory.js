@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import axios from "axios";
 import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();

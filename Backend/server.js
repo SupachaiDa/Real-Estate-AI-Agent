@@ -3,9 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { Client, middleware } from "@line/bot-sdk";
 
-import { replyToClient} from "./replymessage.js";
-
+import { replyToClient, fetchUserHistory, uploadedImg } from "./replymessage.js";
 import { createChatEntry } from "./chatHistory.js"
+import { createUser, getUser, updateUser } from "./user.js"
 dotenv.config();
 
 const app = express();
@@ -46,6 +46,75 @@ app.post("/api/chat", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+app.post("/api/insertimg", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const result = await fetchUserHistory(userId);
+
+  const propertyIdHistory = result.historyPropertyIds
+  const intentHistory = result.intentHistory
+  
+    res.json({ propertyIdHistory  , intentHistory });
+
+  
+  } catch (error) {
+    console.error("Chat API Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/api/insertedimg", async (req, res) => {
+  try {
+    const { userId, imgUrl } = req.body;
+    const result = await uploadedImg(userId, imgUrl);
+
+  
+  
+    res.json({});
+
+  
+  } catch (error) {
+    console.error("Chat API Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/api/signedup", async (req, res) => {
+  try {
+    const { id, name } = req.body;
+    const user = await createUser(id, name)
+    res.json({ });
+  
+  } catch (error) {
+    console.error("Chat API Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/api/loggedin", async (req, res) => {
+  try {
+    const { id } = req.body;
+    const userInfo = await getUser(id)
+    res.json({ userInfo });
+    
+   } catch (error) {
+      console.error("Chat API Error:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  
+  app.post("/api/updateuser", async (req, res) => {
+    try {
+      const { id, name } = req.body;
+      const userInfo = await updateUser(id, name)
+      res.json({ });
+      
+     } catch (error) {
+        console.error("Chat API Error:", error);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
 
 // n8n connected through webhook
 /*import axios from "axios";

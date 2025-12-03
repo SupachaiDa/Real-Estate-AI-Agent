@@ -32,13 +32,10 @@
         </li>
 
        <div class="ms-auto d-flex align-items-center">
-      <button
-        v-if="isLoggedIn"
-        class="btn btn-outline-danger"
-        @click="logout"
-      >
-        Logout
-      </button>
+        
+        <li v-if="isLoggedIn" class="nav-item">
+           <router-link class="nav-link" to="/profile">Profile</router-link>
+        </li>
 
       <router-link
         v-else
@@ -67,11 +64,6 @@ onMounted(() => {
     isLoggedIn.value = !!user;
   });
 });
-
-const logout = async () => {
-  await signOut(auth);
-  router.push("/signedup");
-};
 </script>
 
 <style scoped>

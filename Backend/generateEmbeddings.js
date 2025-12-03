@@ -27,8 +27,7 @@ async function generateEmbeddings() {
     const { data: properties, error } = await supabase
       .from('Properties')
       .select()   // fetch all columns
-      .is('embedding', null) // only rows without embeddings
-      .limit(5);      
+      .is('embedding', null) // only rows without embeddings    
 
     if (error) throw error;
     if (!properties.length) return console.log('✅ All properties already have embeddings.');
@@ -57,7 +56,7 @@ async function generateEmbeddings() {
       const { error: updateError } = await supabase
         .from('Properties')
         .update({ embedding })
-        .eq('Id', prop.id);
+        .eq('Id', prop.Id);
 
       if (updateError) console.error(`❌ Failed to update Id ${prop.id}:`, updateError);
       else console.log(`✅ Updated embedding for Id ${prop.id}`);
@@ -69,6 +68,4 @@ async function generateEmbeddings() {
   }
 }
 
-
-
-generateEmbeddings();
+export { generateEmbeddings }
